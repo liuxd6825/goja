@@ -74,6 +74,14 @@ type Program struct {
 	srcMap   []srcMapItem
 }
 
+func (p *Program) Src() *file.File {
+	return p.src
+}
+
+func (p *Program) FuncName() unistring.String {
+	return p.funcName
+}
+
 type compiler struct {
 	p     *Program
 	scope *scope

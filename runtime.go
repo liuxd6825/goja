@@ -228,6 +228,14 @@ func (f *StackFrame) Position() file.Position {
 	return f.prg.src.Position(f.prg.sourceOffset(f.pc))
 }
 
+func (f *StackFrame) PC() int {
+	return f.pc
+}
+
+func (f *StackFrame) Program() *Program {
+	return f.prg
+}
+
 func (f *StackFrame) WriteToValueBuilder(b *StringBuilder) {
 	if f.prg != nil {
 		if n := f.prg.funcName; n != "" {
