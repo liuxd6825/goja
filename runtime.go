@@ -1728,7 +1728,9 @@ Note that Value.Export() for a `Date` value returns time.Time in local timezone.
 
 # Maps
 
-Maps with string or integer key type are converted into host objects that largely behave like a JavaScript Object.
+Maps with string, integer, or float key types are converted into host objects that largely behave like a JavaScript Object.
+One noticeable difference is that the key order is not stable, as with maps in Go.
+Keys are converted to strings following the fmt.Sprintf("%v") convention.
 
 # Maps with methods
 
@@ -2214,9 +2216,24 @@ func (r *Runtime) toReflectValue(v Value, dst reflect.Value, ctx *objectExportCt
 
 func (r *Runtime) wrapJSFunc(fn Callable, typ reflect.Type) func(args []reflect.Value) (results []reflect.Value) {
 	return func(args []reflect.Value) (results []reflect.Value) {
-		jsArgs := make([]Value, len(args))
-		for i, arg := range args {
-			jsArgs[i] = r.ToValue(arg.Interface())
+		var jsArgs []Value
+		if len(args) > 0 {
+			if typ.IsVariadic() {
+				varArg := args[len(args)-1]
+				args = args[:len(args)-1]
+				jsArgs = make([]Value, 0, len(args)+varArg.Len())
+				for _, arg := range args {
+					jsArgs = append(jsArgs, r.ToValue(arg.Interface()))
+				}
+				for i := 0; i < varArg.Len(); i++ {
+					jsArgs = append(jsArgs, r.ToValue(varArg.Index(i).Interface()))
+				}
+			} else {
+				jsArgs = make([]Value, len(args))
+				for i, arg := range args {
+					jsArgs[i] = r.ToValue(arg.Interface())
+				}
+			}
 		}
 
 		numOut := typ.NumOut()
@@ -2359,7 +2376,7 @@ func (r *Runtime) Set(name string, value interface{}) error {
 // Equivalent to dereferencing a variable by name in non-strict mode. If variable is not defined returns nil.
 // Note, this is not the same as GlobalObject().Get(name),
 // because if a global lexical binding (let or const) exists, it is used instead.
-// This method will panic with an *Exception if a JavaScript exception is thrown in the process.
+// This method will panic with an *Exception if a JavaScript exception is thrown in the process. Use Runtime.Try to catch these.
 func (r *Runtime) Get(name string) Value {
 	n := unistring.NewFromString(name)
 	if v, exists := r.global.stash.getByName(n); exists {
@@ -3134,7 +3151,7 @@ func assertCallable(v Value) (func(FunctionCall) Value, bool) {
 }
 
 // InstanceOf is an equivalent of "left instanceof right".
-// This method will panic with an *Exception if a JavaScript exception is thrown in the process.
+// This method will panic with an *Exception if a JavaScript exception is thrown in the process. Use Runtime.Try to catch these.
 func (r *Runtime) InstanceOf(left Value, right *Object) (res bool) {
 	return instanceOfOperator(left, right)
 }
